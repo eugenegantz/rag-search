@@ -134,7 +134,7 @@ class RagSearch:
         client = OpenAI(
             base_url=self.openai_config["base_url"],
             api_key=self.openai_config["api_key"],
-            default_headers=self.openai_config["default_headers"],
+            default_headers=self.openai_config.get("default_headers"),
         )
         
         res = client.chat.completions.create(

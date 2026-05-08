@@ -7,7 +7,7 @@ class TConfigDaemon(typing.TypedDict):
 class TConfigOpenAI(typing.TypedDict):
     base_url: str
     api_key: str
-    default_headers: dict[str, str]
+    default_headers: typing.NotRequired[dict[str, str]]
 
 class TConfig(typing.TypedDict):
     openai: TConfigOpenAI
