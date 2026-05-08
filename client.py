@@ -63,6 +63,9 @@ class RAGClient:
     def remove(self, filepath: str) -> dict[str, Any]:
         return self._post("/api/index/remove", { "filepath": filepath })
 
+    def shutdown(self) -> dict[str, Any]:
+        return self._post("/api/shutdown", {})
+
 
 def is_daemon_alive() -> bool:
     """Быстрая проверка, отвечает ли демон."""

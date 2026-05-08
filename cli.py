@@ -43,6 +43,7 @@ DAEMON_PORT = config["daemon"]["port"]
 def daemon(
     action: str = typer.Argument(..., help="start | stop | status | restart"),
     port: int = typer.Option(DAEMON_PORT, "--port", "-p"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force kill при остановке"),
 ):
     """
     Управление фоновым демоном RAG.
@@ -56,13 +57,20 @@ def daemon(
         console.print(f"[blue]Запуск демона на порту {port}...[/blue]")
         console.print("[dim]Модели загружаются в фоне (~10-30 сек)...[/dim]")
 
-        # Запускаем daemon.py в фоновом процессе
-        proc = subprocess.Popen(
-            [sys.executable, "daemon.py"],
+        # Кросс-платформенный detached запуск
+        popen_kwargs: dict[str, object] = dict(
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,  # Отвязываем от терминала
         )
+        if sys.platform == "win32":
+            popen_kwargs["creationflags"] = (
+                subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            )
+        else:
+            popen_kwargs["start_new_session"] = True
+
+        proc = subprocess.Popen([sys.executable, "daemon.py"], **popen_kwargs) # type: ignore
 
         # Ждем, пока демон создаст PORT_FILE
         with Progress(
@@ -87,19 +95,42 @@ def daemon(
         console.print("[dim]Веб-интерфейс: http://{host}:{port}[/dim]".format(host=DAEMON_HOST, port=port))
 
     elif action == "stop":
-        if not PID_FILE.exists():
-            console.print("[yellow]Демон не запущен (PID-файл не найден)[/yellow]")
-            return
-
-        pid = int(PID_FILE.read_text().strip())
-        try:
-            os.kill(pid, signal.SIGTERM)
-            console.print("[bold green]✓ Демон остановлен[/bold green]")
-        except ProcessLookupError:
-            console.print("[yellow]Процесс не найден, чистим файлы[/yellow]")
-        finally:
+        if not is_daemon_alive():
+            console.print("[yellow]Демон не запущен[/yellow]")
             PID_FILE.unlink(missing_ok=True)
             PORT_FILE.unlink(missing_ok=True)
+            return
+
+        if not force:
+            # Graceful shutdown через API
+            try:
+                client = RAGClient()
+                client.shutdown()
+                # Ждем завершения до 5 сек
+                for _ in range(5):
+                    time.sleep(1)
+                    if not is_daemon_alive():
+                        break
+                else:
+                    console.print("[yellow]Graceful shutdown не удался, используем force...[/yellow]")
+                    force = True
+            except Exception as e:
+                console.print(f"[yellow]Ошибка graceful shutdown: {e}, используем force...[/yellow]")
+                force = True
+
+        if force:
+            if not PID_FILE.exists():
+                console.print("[yellow]PID-файл не найден, чистим файлы[/yellow]")
+            else:
+                pid = int(PID_FILE.read_text().strip())
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    console.print("[yellow]Процесс не найден, чистим файлы[/yellow]")
+
+        PID_FILE.unlink(missing_ok=True)
+        PORT_FILE.unlink(missing_ok=True)
+        console.print("[bold green]✓ Демон остановлен[/bold green]")
 
     elif action == "status":
         if is_daemon_alive():
@@ -113,7 +144,7 @@ def daemon(
 
     elif action == "restart":
         try:
-            daemon("stop")
+            daemon("stop", force=force)
         except SystemExit:
             pass
         time.sleep(1)

@@ -31,6 +31,8 @@ from core.deps.rag_search import rag
 DAEMON_HOST = config["daemon"]["host"]
 DAEMON_PORT = config["daemon"]["port"]
 
+_uvicorn_server: uvicorn.Server | None = None
+
 # Фоновая очередь индексации
 background_queue: queue.Queue[
     tuple[
@@ -132,6 +134,17 @@ def health():
     }
 
 
+@app.post("/api/shutdown")
+def shutdown():
+    """Graceful shutdown демона."""
+    def _stop():
+        if _uvicorn_server is not None:
+            _uvicorn_server.should_exit = True
+
+    threading.Thread(target=_stop, daemon=True).start()
+    return {"status": "shutting_down"}
+
+
 @handleErrorDecorator
 @app.post("/api/search")
 def api_search(req: SearchRequest):
@@ -213,6 +226,9 @@ def start_daemon(
 
     cfg = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(cfg)
+
+    global _uvicorn_server
+    _uvicorn_server = server
 
     # Сохраняем PID и порт для CLI-клиента
     PID_FILE.parent.mkdir(parents=True, exist_ok=True)
