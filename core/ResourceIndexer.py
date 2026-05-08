@@ -1,0 +1,113 @@
+import os
+import uuid
+import logging
+import typing
+from core.types import TCDBMetaEntry
+from datetime import datetime
+from pathlib import Path
+
+from core.chunking import read_chunks_from_file
+from core.consts import ALLOWED_EXTENSIONS
+
+class ResourceIndexer:
+    """Индексатор документов в ChromaDB."""
+
+    def __init__(
+        self,
+        db: typing.Any,
+        pipe: typing.Any,
+        name: str,
+        logger: logging.Logger | None = None,
+    ):
+        """
+        Args:
+            db: chromadb.PersistentClient instance
+            pipe: transformers pipeline("feature-extraction")
+            name: имя коллекции в ChromaDB
+        """
+        self.db = db
+        self.pipe = pipe
+        self.logger = logger
+        self.name = name
+        self.collection = db.get_or_create_collection(name=name)
+
+
+    def validate_file_path(self, filepath: str) -> tuple[bool, str]:
+        """Проверяет путь к файлу на валидность."""
+        path = Path(filepath)
+
+        if path.suffix.lower() not in ALLOWED_EXTENSIONS:
+            return False, f"Неподдерживаемый формат: {path.suffix}"
+        
+        if not path.exists():
+            return False, f"Файл не найден: {filepath}"
+        
+        if not path.is_file():
+            return False, f"Не файл: {filepath}"
+
+        return True, ""
+
+
+    def add_file_to_index(self, filepath: str) -> None:
+        """Добавить файл в индекс (создаёт новые записи)."""
+
+        filepath = os.path.abspath(os.path.normpath(filepath))
+        chunks = read_chunks_from_file(filepath)
+
+        if not chunks:
+            return
+
+        for index, chunk in enumerate(chunks):
+            emb = self.pipe(chunk)[0][0]
+            _id = str(uuid.uuid4())
+
+            self.collection.add(
+                ids=[_id],
+                embeddings=[emb],
+                documents=[filepath],
+                metadatas=[{"filepath": filepath, "chunk_index": index}],
+            )
+
+        if self.logger:
+            self.logger.info({
+                "event": "file-added-to-index",
+                "target": "ResourceIndexer",
+                "filepath": filepath,
+                "chunks.length": len(chunks),
+                "datetime": str(datetime.now()),
+            })
+
+
+    def upsert_file_to_index(self, filepath: str) -> None:
+        """Обновить файл в индексе (удалить старое + добавить новое)."""
+
+        filepath = os.path.abspath(os.path.normpath(filepath))
+
+        self.collection.delete(where={"filepath": filepath})
+        self.add_file_to_index(filepath)
+
+
+    def list_indexed_files(self) -> list[str]:
+        """Получить список всех файлов в индексе."""
+
+        results = self.collection.get()
+        metas: list[TCDBMetaEntry] = results["metadatas"] or []
+        files = {meta.get("filepath", "") for meta in metas if meta.get("filepath")}
+        
+        return sorted(files)
+    
+
+    def remove_from_index(self, filepath: str) -> None:
+        """Удалить файл из индекса."""
+
+        filepath = os.path.abspath(os.path.normpath(filepath))
+
+        self.collection.delete(where={"filepath": filepath})
+
+        if self.logger:
+            self.logger.info({
+                "event": "file-removed-from-index",
+                "target": "ResourceIndexer",
+                "filepath": filepath,
+                "datetime": str(datetime.now()),
+            })

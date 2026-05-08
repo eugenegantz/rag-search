@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Поиск — Добавить документ</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="p-page">
+    <header class="b-header">
+        <div class="b-header__container">
+            <div class="b-header__logo">RAG-ПОИСК</div>
+            <nav class="b-nav">
+                <a class="b-nav__link" href="/">Поиск</a>
+                <a class="b-nav__link b-nav__link_active" href="/add">Добавить документ</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="p-page__container">
+        <div class="b-card">
+            <h1 class="b-card__title">Добавить документы в индекс</h1>
+            
+            <div class="b-field">
+                <label class="b-field__label" for="file_path">Путь к файлам</label>
+                <textarea class="b-field__input b-field__input_size_large" id="file_path" placeholder=""></textarea>
+                <div class="b-field__help">Поддерживаемые форматы: .docx, .pdf, .txt, .md</div>
+            </div>
+            
+            <button class="b-btn" id="add-btn">Добавить в индекс</button>
+            
+            <div class="b-status" id="add-status" style="display: none;"></div>
+        </div>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

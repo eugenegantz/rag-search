@@ -1,0 +1,10 @@
+.ipynb_checkpoints
+.vscode
+.vs
+.env
+.rag
+db
+notes
+*.ignore.*
+*.log
+__pycache__
