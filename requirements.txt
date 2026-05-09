@@ -19,6 +19,7 @@ openai>=1.0.0
 # Document parsing
 python-docx>=0.8.11
 pypdf>=3.0.0
+html2text>=2025.4.15
 
 # Utilities
 pydantic>=2.0.0

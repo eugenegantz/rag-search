@@ -1,8 +1,11 @@
 const API_BASE = '';
 
-const ALLOWED_EXTENSIONS = ['.docx', '.pdf', '.txt', '.md'];
+const ALLOWED_EXTENSIONS = ['.docx', '.pdf', '.txt', '.md', '.html'];
 
 function validateFilePath(path) {
+    if (/^http(s?):\/\//ig.test(path)) {
+        return true
+    }
     const ext = path.toLowerCase().slice(path.lastIndexOf('.'));
     return ALLOWED_EXTENSIONS.includes(ext);
 }
@@ -191,8 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pathInput) {
         pathInput.placeholder = ""
             + "Построчно:"
-            + "\nZ:/Имя Фамилия/file_1.pdf"
-            + "\nZ:/Имя Фамилия/file_2.pdf"
-            + "\nZ:/Имя Фамилия/file_3.pdf"
+            + "\nZ:/Имя Фамилия/Статья.docx"
+            + "\nZ:/Имя Фамилия/Договор.pdf"
+            + "\nZ:/Имя Фамилия/Заметки.txt"
+            + "\nZ:/Имя Фамилия/Инструкция.md"
+            + "\nZ:/Имя Фамилия/Страница.html"
+            + "\nhttps://website.com/page"
     }
 });

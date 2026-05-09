@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import logging
 import typing
@@ -32,16 +33,38 @@ class ResourceIndexer:
         self.collection = db.get_or_create_collection(name=name)
 
 
+    def unify_path(self, path: str) -> str:
+        """Привести пути к единому виду"""
+
+        path = path.strip()
+        if self.is_web_url(path):
+            return path
+        return os.path.abspath(os.path.normpath(path))
+
+
+    def is_web_url(self, url: str) -> bool:
+        url = url.strip()
+
+        if re.findall(r'^http(s?):', url, re.I):
+            return True
+        else:
+            return False
+
+
     def validate_file_path(self, filepath: str) -> tuple[bool, str]:
         """Проверяет путь к файлу на валидность."""
+
         path = Path(filepath)
+
+        if self.is_web_url(str(filepath)):
+            return True, ""
 
         if path.suffix.lower() not in ALLOWED_EXTENSIONS:
             return False, f"Неподдерживаемый формат: {path.suffix}"
         
         if not path.exists():
             return False, f"Файл не найден: {filepath}"
-        
+
         if not path.is_file():
             return False, f"Не файл: {filepath}"
 
@@ -51,7 +74,7 @@ class ResourceIndexer:
     def add_file_to_index(self, filepath: str) -> None:
         """Добавить файл в индекс (создаёт новые записи)."""
 
-        filepath = os.path.abspath(os.path.normpath(filepath))
+        filepath = self.unify_path(filepath)
         chunks = read_chunks_from_file(filepath)
 
         if not chunks:
@@ -81,7 +104,7 @@ class ResourceIndexer:
     def upsert_file_to_index(self, filepath: str) -> None:
         """Обновить файл в индексе (удалить старое + добавить новое)."""
 
-        filepath = os.path.abspath(os.path.normpath(filepath))
+        filepath = self.unify_path(filepath)
 
         self.collection.delete(where={"filepath": filepath})
         self.add_file_to_index(filepath)
@@ -93,14 +116,14 @@ class ResourceIndexer:
         results = self.collection.get()
         metas: list[TCDBMetaEntry] = results["metadatas"] or []
         files = {meta.get("filepath", "") for meta in metas if meta.get("filepath")}
-        
+
         return sorted(files)
-    
+
 
     def remove_from_index(self, filepath: str) -> None:
         """Удалить файл из индекса."""
 
-        filepath = os.path.abspath(os.path.normpath(filepath))
+        filepath = self.unify_path(filepath)
 
         self.collection.delete(where={"filepath": filepath})
 
