@@ -1,147 +1,150 @@
-import re
 import typing
-import docx
-import html2text
-import requests
-from pypdf import PdfReader
+from core.types import TChunk
 
 SEQ_LEN_LIM = 1024
 
+TWordIteratorResult = typing.Iterable[
+    tuple[
+        str,
+        tuple[int, ...],
+        tuple[int, ...],
+    ]
+]
 
-def words_iter(text: str, keep_lf: bool = False) -> typing.Generator[str]:
+TCharsIteratorResult = typing.Iterable[
+    tuple[
+        str,
+        tuple[int, ...],
+    ]
+]
+
+def create_words_with_coords(
+    chars_with_coords: TCharsIteratorResult,
+    delimiters: list[str] = [" ", "\n"],
+) -> TWordIteratorResult:
+    """Преобразует итератор символов в итератор слов с координатами."""
     word = ""
-    for s in text:
-        if s == " " or (s == "\n" and keep_lf == False):
+    start: tuple[int, ...] = tuple()
+    end: tuple[int, ...] = tuple()
+
+    for char, coord in chars_with_coords:
+        if char in delimiters:
             if word:
-                yield word
+                yield word, start, end
                 word = ""
+                start = tuple()
         else:
-            word += s
+            if not start:
+                start = coord
+            word += char
+            end = coord
+
     if word:
-        yield word
+        yield word, start, end
 
 
-def create_chunks(
-    words: typing.Iterator[str],
+def create_sentences_with_coords(
+    words_with_coords: TWordIteratorResult,
     chunk_size: int = SEQ_LEN_LIM
-) -> list[str]:
-    chunks: list[str] = []
-    chunk = ""
-    sentence = ""
+):
+    """Возвращает предложения из итератора слов.
 
-    for word in words:
+    Каждое предложение — последовательность слов, разделённых пробелами,
+    которая заканчивается точкой (.), вопросительным (?) или
+    восклицательным (!) знаком.
+    Длина предложения не превышает chunk_size (символы).
+    Если накопленный текст превышает chunk_size, возвращает накопленное
+    до текущего слова и начинает новый буфер.
+    Слова длиннее chunk_size пропускаются (аномалия).
+    """
+    sentence_text = ""
+    sentence_start: tuple[int, ...] = tuple()
+    sentence_end: tuple[int, ...] = tuple()
+    END_OF_SENTENCE_MARKS = ".?!"
+
+    for word, word_start, word_end in words_with_coords:
         word = word.strip(" ")
 
         if not word:
             continue
 
-        if len(sentence) + len(word) + 1 > chunk_size:
-            chunks.append(sentence.strip())
-            chunk = ""
-            sentence = ""
-        sentence += (" " + word)
+        # Аномалия: слово длиннее chunk_size.
+        # Возможно в будущем здесь стоит добавить исключение.
+        if len(word) > chunk_size:
+            continue
 
-        if sentence[-1] == ".":
-            if len(chunk) + len(sentence) > chunk_size:
-                chunks.append(chunk.strip())
-                chunk = ""
-            chunk += sentence
-            sentence = ""
+        separator = 1 if sentence_text else 0
+        candidate_len = len(sentence_text) + separator + len(word)
 
-    chunk += sentence
-    chunks.append(chunk.strip())
+        if candidate_len > chunk_size:
+            if sentence_text:
+                yield sentence_text, sentence_start, sentence_end
+            sentence_text = word
+            sentence_start = word_start
+            sentence_end = word_end
+        else:
+            if sentence_text:
+                sentence_text += " "
+            else:
+                sentence_start = word_start
+            sentence_text += word
+            sentence_end = word_end
 
-    return chunks
+        if sentence_text and sentence_text[-1] in END_OF_SENTENCE_MARKS:
+            yield sentence_text, sentence_start, sentence_end
+            sentence_text = ""
+            sentence_start = tuple()
+            sentence_end = tuple()
 
-
-def read_chunks_from_msdoc_file(filepath: str, chunk_size: int = SEQ_LEN_LIM) -> list[str]:
-    doc = docx.Document(filepath)
-
-    def _iter():
-        for para in doc.paragraphs:
-            words = words_iter(para.text.strip())
-            for word in words:
-                yield word
-
-    return create_chunks(_iter(), chunk_size)
-
-
-def read_chunks_from_txt_file(filepath: str, chunk_size: int = SEQ_LEN_LIM) -> list[str]:
-    with open(filepath, encoding="utf-8") as fd:
-        return create_chunks(words_iter(fd.read()), chunk_size)
+    if sentence_text:
+        yield sentence_text, sentence_start, sentence_end
 
 
-def read_chunks_from_md_file(filepath: str, chunk_size: int = SEQ_LEN_LIM) -> list[str]: 
-    with open(filepath, encoding="utf-8", mode="r") as fd:
-        return create_chunks(words_iter(fd.read(), keep_lf=True), chunk_size)
+def create_chunks_with_coords(
+    chars_with_coords: typing.Iterable[tuple[str, tuple[int, ...]]],
+    chunk_size: int = SEQ_LEN_LIM,
+    delimiters: list[str] = [" ", "\n"],
+) -> typing.Iterator[TChunk]:
+    """Потоковое создание чанков из итератора по символам (char, coord).
 
+    Каждый chunk — последовательность предложений, разделённых пробелами.
+    Длина chunk не превышает chunk_size (символы).
+    Если накопленный текст превышает chunk_size, возвращает накопленное
+    до текущего предложения и начинает новый chunk.
+    coord — кортеж координат произвольной длины: (char_idx,) или (page, char_idx) и т.д.
+    """
+    chunk_text = ""
+    chunk_start: tuple[int, ...] = tuple()
+    chunk_end: tuple[int, ...] = tuple()
 
-def read_chunks_from_pdf_file(filepath: str, chunk_size: int = SEQ_LEN_LIM) -> list[str]:
-    reader = PdfReader(filepath)
+    for sentence, sentence_start, sentence_end in create_sentences_with_coords(
+        create_words_with_coords(chars_with_coords, delimiters),
+        chunk_size
+    ):
+        separator = 1 if chunk_text else 0
+        candidate_len = len(chunk_text) + separator + len(sentence)
 
-    def _iter():
-        for page in reader.pages:
-            text = page.extract_text()
-            words = words_iter(text.strip())
-            for word in words:
-                yield word
+        if candidate_len > chunk_size:
+            if chunk_text:
+                yield {
+                    "text": chunk_text,
+                    "from": list(chunk_start),
+                    "to": list(chunk_end),
+                }
+            chunk_text = sentence
+            chunk_start = sentence_start
+            chunk_end = sentence_end
+        else:
+            if chunk_text:
+                chunk_text += " "
+            else:
+                chunk_start = sentence_start
+            chunk_text += sentence
+            chunk_end = sentence_end
 
-    return create_chunks(_iter(), chunk_size)
-
-
-def read_chunks_from_web_url(url: str, chunk_size: int = SEQ_LEN_LIM) -> list[str]:
-    converter = html2text.HTML2Text()
-
-    converter.bypass_tables     = False     # Конвертировать таблицы
-    converter.ignore_links      = False     # Конвертировать ссылки
-    converter.ignore_images     = False     # Конвертировать изображения
-    converter.ignore_emphasis   = False     # Конвертировать жирный текст
-
-    res = requests.get(
-        url,
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+    if chunk_text:
+        yield {
+            "text": chunk_text,
+            "from": list(chunk_start),
+            "to": list(chunk_end),
         }
-    )
-
-    text = converter.handle(res.text)
-
-    return create_chunks(words_iter(text.strip(), keep_lf=True), chunk_size)
-
-
-def read_chunks_from_html_file(filepath: str, chunk_size: int = SEQ_LEN_LIM) -> list[str]:
-    with open(filepath, encoding="utf-8", mode="r") as fd:
-        text_html = fd.read()
-
-    converter = html2text.HTML2Text()
-
-    converter.bypass_tables     = False     # Конвертировать таблицы
-    converter.ignore_links      = False     # Конвертировать ссылки
-    converter.ignore_images     = False     # Конвертировать изображения
-    converter.ignore_emphasis   = False     # Конвертировать жирный текст
-
-    text_md = converter.handle(text_html)
-
-    return create_chunks(words_iter(text_md.strip(), keep_lf=True), chunk_size)
-
-
-def read_chunks_from_file(url: str) -> list[str]:
-    if re.findall(r'^https:|^http:', url, re.I):
-        return read_chunks_from_web_url(url)
-
-    elif re.findall(r'\.html$', url, re.I):
-        return read_chunks_from_html_file(url)
-
-    elif re.findall(r'\.txt$', url, re.I):
-        return read_chunks_from_txt_file(url)
-
-    elif re.findall(r'\.md$', url, re.I):
-        return read_chunks_from_md_file(url)
-
-    elif re.findall(r'\.docx$', url, re.I):
-        return read_chunks_from_msdoc_file(url)
-
-    elif re.findall(r'\.pdf$', url, re.I):
-        return read_chunks_from_pdf_file(url)
-
-    return []

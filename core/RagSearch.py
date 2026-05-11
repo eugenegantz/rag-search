@@ -3,10 +3,10 @@ import logging
 from datetime import datetime
 from openai import OpenAI
 
-from core.chunking import read_chunks_from_file
+from core.readers.ChunkReaderFactory import ChunkReaderFactory
+from core.readers.BaseChunkReader import BaseChunkReader, TChunkArgs
 from core.types import TRagSearchResult, TContextEntry, TCDBMetaEntry, TConfigOpenAI
 from core.ResourceIndexer import ResourceIndexer
-from core.utils.objects import get as nget
 
 
 TEST_RESPONSE = """
@@ -123,13 +123,11 @@ class RagSearch:
         
         prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context, query=query)
         
-        if self.logger:
-            self.logger.info({
-                "event": "rag-search",
-                "context_length": len(context),
-                "prompt_length": len(prompt),
-                "datetime": str(datetime.now()),
-            })
+        if "__TEST_RETURN_PROMPT__" == query:
+            return {
+                "content": prompt,
+                "refs": [],
+            }
 
         client = OpenAI(
             base_url=self.openai_config["base_url"],
@@ -142,8 +140,55 @@ class RagSearch:
             messages=[{"role": "user", "content": prompt}],
             extra_body={"thinking": {"type": "disabled"}},
         )
+
+        # ПРИМЕР ОТВЕТА:
+        #
+        # ChatCompletion(
+        #     id='chatcmpl-hFj...',
+        #     choices=[
+        #         Choice(
+        #             finish_reason='stop',
+        #             index=0,
+        #             logprobs=None,
+        #             message=ChatCompletionMessage(
+        #                 content='abc ... [^ref_01].\n\n[{"id":"ref_01","filepath":"....","note":"..."}, ...]',
+        #                 refusal=None,
+        #                 role='assistant',
+        #                 annotations=None,
+        #                 audio=None,
+        #                 function_call=None,
+        #                 tool_calls=None
+        #             )
+        #         )
+        #     ],
+        #     created=1778618709,
+        #     model='...',
+        #     object='chat.completion',
+        #     service_tier=None,
+        #     system_fingerprint=None,
+        #     usage=CompletionUsage(
+        #         completion_tokens=672,
+        #         prompt_tokens=4465,
+        #         total_tokens=5137,
+        #         completion_tokens_details=None,
+        #         prompt_tokens_details=PromptTokensDetails(
+        #             audio_tokens=None,
+        #             cached_tokens=4465
+        #         ),
+        #         cached_tokens=4465
+        #     )
+        # )
         
         content = res.choices[0].message.content or ""
+
+        if self.logger:
+            self.logger.info({
+                "event": "rag-search",
+                "context_length": len(context),
+                "prompt_length": len(prompt),
+                "content_length": len(content),
+                "datetime": str(datetime.now()),
+            })
         
         return self.parse_result(content)
 
@@ -156,41 +201,47 @@ class RagSearch:
         """Найти релевантные контексты по запросу."""
 
         outputs = self.resource_indexer.pipe(query)[0][0]
-        
+
         results = self.resource_indexer.collection.query(
             query_embeddings=[outputs],
             n_results=n_results,
         )
-        
+
         metas:      list[TCDBMetaEntry]             = results["metadatas"][0] or []
-        filedatas:  dict[str, dict[str, object]]    = {}
+        file_metas: dict[str, list[TChunkArgs]]     = {}
         context:    list[TContextEntry]             = []
 
         for meta in metas:
-            chunk_index = meta.get("chunk_index", 0)
             filepath = meta.get("filepath", "")
-            
             if not filepath:
                 continue
-            
-            if filepath not in filedatas:
-                chunks              = read_chunks_from_file(filepath)
-                filedatas[filepath] = { "chunks": chunks }
 
-            chunks = filedatas[filepath]["chunks"]
+            if filepath not in file_metas:
+                file_metas[filepath] = []
 
-            content = (""                               # type: ignore
-                + nget(chunks, [chunk_index - 1], "")   # type: ignore
-                + nget(chunks, [chunk_index], "")       # type: ignore
-                + nget(chunks, [chunk_index + 1], "")   # type: ignore
-            )                                           # type: ignore
+            file_metas[filepath].append({
+                "from": meta["from"],
+                "to": meta["to"],
+            })
+
+        _readers: dict[str, BaseChunkReader] = dict()
+
+        for filepath, meta_list in file_metas.items():
+            reader = _readers.get(filepath, None)
+
+            if not reader:
+                reader = ChunkReaderFactory.get_reader(filepath)
+                _readers[filepath] = reader
+
+            chunks = reader.getChunks(meta_list)
+
+            content = "\n\n".join(chunk["text"] for chunk in chunks)
 
             context.append({
                 "filepath": filepath,
                 "content": content,
-                "chunk_index": chunk_index,
             })
 
-        context.sort(key=lambda row: (row["filepath"], row["chunk_index"]))
+        context.sort(key=lambda row: row["filepath"])
 
         return context

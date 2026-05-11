@@ -7,7 +7,7 @@ from core.types import TCDBMetaEntry
 from datetime import datetime
 from pathlib import Path
 
-from core.chunking import read_chunks_from_file
+from core.readers.ChunkReaderFactory import ChunkReaderFactory
 from core.consts import ALLOWED_EXTENSIONS
 
 class ResourceIndexer:
@@ -75,20 +75,24 @@ class ResourceIndexer:
         """Добавить файл в индекс (создаёт новые записи)."""
 
         filepath = self.unify_path(filepath)
-        chunks = read_chunks_from_file(filepath)
+        reader = ChunkReaderFactory.get_reader(filepath)
+        chunks = reader.createChunksIterator()
+        chunks_length = 0
 
-        if not chunks:
-            return
-
-        for index, chunk in enumerate(chunks):
-            emb = self.pipe(chunk)[0][0]
+        for chunk in chunks:
+            chunks_length += 1
+            emb = self.pipe(chunk["text"])[0][0]
             _id = str(uuid.uuid4())
 
             self.collection.add(
                 ids=[_id],
                 embeddings=[emb],
                 documents=[filepath],
-                metadatas=[{"filepath": filepath, "chunk_index": index}],
+                metadatas=[{
+                    "filepath": filepath,
+                    "from": chunk["from"],
+                    "to": chunk["to"],
+                }],
             )
 
         if self.logger:
@@ -96,7 +100,7 @@ class ResourceIndexer:
                 "event": "file-added-to-index",
                 "target": "ResourceIndexer",
                 "filepath": filepath,
-                "chunks.length": len(chunks),
+                "chunks.length": chunks_length,
                 "datetime": str(datetime.now()),
             })
 

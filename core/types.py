@@ -13,14 +13,25 @@ class TConfig(typing.TypedDict):
     openai: TConfigOpenAI
     daemon: TConfigDaemon
 
-class TCDBMetaEntry(typing.TypedDict):
-    filepath: str
-    chunk_index: int
+TChunk = typing.TypedDict("TChunk", {
+    "text": str,
+    "from": list[int],
+    "to": list[int],
+})
 
+TChunkArgs = typing.TypedDict("TChunkArgs", {
+    "from": list[int],
+    "to": list[int],
+})
+
+TCDBMetaEntry = typing.TypedDict('TCDBMetaEntry', {
+    "filepath": str,
+    "from": list[int],
+    "to": list[int],
+})
 
 class TContextEntry(typing.TypedDict):
     filepath: str
-    chunk_index: int
     content: str
 
 
