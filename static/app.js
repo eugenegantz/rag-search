@@ -166,10 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (searchBtn) {
         searchBtn.dataset.originalText = searchBtn.textContent;
         searchBtn.addEventListener('click', searchDocuments);
-        
-        document.getElementById('query')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') searchDocuments();
-        });
     }
     
     const addBtn = document.getElementById('add-btn');
