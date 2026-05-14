@@ -8,6 +8,7 @@ class TConfigOpenAI(typing.TypedDict):
     base_url: str
     api_key: str
     default_headers: typing.NotRequired[dict[str, str]]
+    model: str
 
 class TConfig(typing.TypedDict):
     openai: TConfigOpenAI

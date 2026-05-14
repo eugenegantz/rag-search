@@ -136,7 +136,7 @@ class RagSearch:
         )
         
         res = client.chat.completions.create(
-            model="kimi-for-coding",
+            model=self.openai_config["model"],
             messages=[{"role": "user", "content": prompt}],
             extra_body={"thinking": {"type": "disabled"}},
         )
