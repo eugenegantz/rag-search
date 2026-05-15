@@ -10,6 +10,7 @@ import json
 import subprocess
 import signal
 import time
+import typing
 from pathlib import Path
 from typing import List
 
@@ -291,6 +292,51 @@ def index_list():
 
     console.print(table)
     console.print(f"\nВсего: [bold]{len(filepaths)}[/bold] файлов")
+
+
+@index_app.command("query")
+def index_query(
+    query: str = typer.Argument(..., help="Запрос"),
+    format: str = typer.Option("table", "--format", "-f"),
+    type_filter: str = typer.Option(None, "--type", help="Фильтр по типу: image"),
+):
+    """
+    Поиск файлов без LLM.
+    """
+    client = RAGClient()
+
+    query_args: dict[str, typing.Any] = {
+        "query": query,
+    }
+
+    if "image" == type_filter:
+        query_args["rtype"] = "image"
+
+    res = client.index_query(**query_args)
+
+    if res.get("error", ""):
+        console.print(f"[red]{res['error']}[/red]")
+        raise typer.Exit(1)
+
+    metas: list[dict[str, str]] = res["meta"]
+
+    if not metas:
+        console.print("[yellow]Индекс пуст.[/yellow]")
+        return
+    
+    if "list" == format or "ls" == format:
+        for i, row in enumerate(metas):
+            print(row["filepath"])
+    else:
+        table = Table(title="Файлы")
+        table.add_column("#", style="dim", justify="right")
+        table.add_column("Путь к файлу", style="green")
+
+        for i, row in enumerate(metas):
+            table.add_row(str(i), row["filepath"])
+
+        console.print(table)
+        console.print(f"\nВсего: [bold]{len(metas)}[/bold] файлов")
 
 
 @index_app.command("remove")

@@ -14,10 +14,11 @@ import threading
 
 from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from pathlib import Path as _Path
 
 from app_config.config import config
 from core.paths import PORT_FILE, PID_FILE
@@ -76,6 +77,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 class SearchRequest(BaseModel):
     query: str
     top_k: typing.Optional[int] = 10
+    rtype: typing.Optional[str] = ""
 
 
 class IndexRequest(BaseModel):
@@ -100,6 +102,10 @@ def read_root():
 @app.get("/add")
 def read_add():
     return FileResponse("static/add.html")
+
+@app.get("/search-files")
+def read_search_files():
+    return FileResponse("static/search-files.html")
 
 
 # --- API endpoints ---
@@ -149,10 +155,10 @@ def shutdown():
 @app.post("/api/search")
 def api_search(req: SearchRequest):
     """RAG-поиск по индексированным документам."""
-    res = rag.search(req.query, n_results=req.top_k or 10)
+    results = rag.search(req.query, n_results=req.top_k or 10)
 
     return {
-        "results": [res]
+        "results": results
     }
 
 
@@ -163,6 +169,20 @@ def api_context(req: SearchRequest):
     ctx = rag.fetch_context(req.query, n_results=req.top_k or 10)
     return {
         "context": ctx
+    }
+
+
+@handleErrorDecorator
+@app.post("/api/index/query")
+def api_index_query(req: SearchRequest):
+    """Сырой поиск по файлам (без LLM)."""
+    meta = rag.search_meta(
+        query=req.query,
+        n_results=req.top_k or 10,
+        rtype=req.rtype or "",
+    )
+    return {
+        "meta": meta
     }
 
 
@@ -212,6 +232,28 @@ def api_remove(req: RemoveRequest):
     assert _indexer is not None
     _indexer.remove_from_index(req.filepath)
     return { "message": "Удалено" }
+
+
+@app.get("/files/{filepath:path}")
+def static_files_get(filepath: str):
+    """Получить файл из индекса."""
+
+    print('test test test')
+
+    ext = _Path(filepath).suffix.lower()
+
+    p = _Path(filepath)
+
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Файл не существует на диске")
+
+    media_types = {
+        ".jpeg": "image/jpeg",
+        ".jpg": "image/jpeg",
+        ".png": "image/png",
+    }
+
+    return FileResponse(filepath, media_type=media_types.get(ext, "application/octet-stream"))
 
 
 # --- Точка входа ---

@@ -349,3 +349,37 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+.b-image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.b-image-item {
+    text-align: center;
+}
+
+.b-image-item:hover {
+    opacity: 0.8;
+}
+
+.b-image-item__link {
+    text-decoration: none;
+}
+
+.b-image-item__thumb {
+    max-width: 100%;
+    max-height: 12rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-light);
+    object-fit: cover;
+}
+
+.b-image-item__path {
+    font-size: var(--font-sm);
+    color: var(--color-text-muted);
+    margin-top: var(--space-xs);
+    word-break: break-all;
+}

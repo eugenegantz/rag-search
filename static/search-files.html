@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG Поиск — Поиск документов</title>
+    <title>RAG Поиск — Поиск файлов</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="p-page">
@@ -11,8 +11,8 @@
         <div class="b-header__container">
             <div class="b-header__logo">RAG-ПОИСК</div>
             <nav class="b-nav">
-                <a class="b-nav__link b-nav__link_active" href="/">Нейропоиск</a>
-                <a class="b-nav__link" href="/search-files">Поиск файлов</a>
+                <a class="b-nav__link" href="/">Нейропоиск</a>
+                <a class="b-nav__link b-nav__link_active" href="/search-files">Поиск файлов</a>
                 <a class="b-nav__link" href="/add">Добавить</a>
             </nav>
         </div>
@@ -20,23 +20,21 @@
 
     <main class="p-page__container">
         <div class="b-card">
-            <h1 class="b-card__title">Поиск по документам</h1>
+            <h1 class="b-card__title">Поиск файлов в индексе</h1>
             
             <div class="b-field">
                 <label class="b-field__label" for="query">Поисковый запрос</label>
-                <textarea class="b-field__input" id="query" placeholder="Введите запрос на русском или английском..."></textarea>
+                <textarea class="b-field__input" id="query" placeholder="Введите запрос для поиска файлов..."></textarea>
             </div>
             
-            <button class="b-btn" id="search-btn">Найти</button>
+            <button class="b-btn" id="search-files-btn">Найти</button>
             
-            <div class="b-status" id="search-status" style="display: none;"></div>
+            <div class="b-status" id="search-files-status" style="display: none;"></div>
             
-            <div class="b-results" id="results"></div>
+            <div class="b-results" id="search-files-results"></div>
         </div>
     </main>
 
-    <script src="/static/lib/marked.min.js"></script>
-    <script src="/static/lib/purify.min.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from core.readers.ChunkReaderFactory import ChunkReaderFactory
 from core.consts import ALLOWED_EXTENSIONS
+from core.utils.paths import get_resource_type
 
 class ResourceIndexer:
     """Индексатор документов в ChromaDB."""
@@ -75,6 +76,7 @@ class ResourceIndexer:
         """Добавить файл в индекс (создаёт новые записи)."""
 
         filepath = self.unify_path(filepath)
+        rtype = get_resource_type(filepath)
         reader = ChunkReaderFactory.get_reader(filepath)
         chunks = reader.createChunksIterator()
         chunks_length = 0
@@ -92,6 +94,7 @@ class ResourceIndexer:
                     "filepath": filepath,
                     "from": chunk["from"],
                     "to": chunk["to"],
+                    "rtype": rtype,
                 }],
             )
 

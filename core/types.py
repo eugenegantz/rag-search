@@ -27,6 +27,7 @@ TChunkArgs = typing.TypedDict("TChunkArgs", {
 
 TCDBMetaEntry = typing.TypedDict('TCDBMetaEntry', {
     "filepath": str,
+    "rtype": str,
     "from": list[int],
     "to": list[int],
 })
@@ -34,6 +35,7 @@ TCDBMetaEntry = typing.TypedDict('TCDBMetaEntry', {
 class TContextEntry(typing.TypedDict):
     filepath: str
     content: str
+    rtype: str
 
 
 class TRagSearchResRef(typing.TypedDict):

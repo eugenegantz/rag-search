@@ -56,6 +56,9 @@ class RAGClient:
 
     def index(self, files: list[str], upsert: bool = True) -> dict[str, Any]:
         return self._post("/api/index/add", { "filepath": files })
+    
+    def index_query(self, query: str, top_k: int = 10, rtype: str = "") -> dict[str, Any]:
+        return self._post("/api/index/query", { "query": query, "top_k": top_k, "rtype": rtype })
 
     def files(self) -> dict[str, Any]:
         return self._get("/api/index/get")

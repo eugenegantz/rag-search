@@ -1,4 +1,6 @@
+import os
 import json
+import typing
 import logging
 from datetime import datetime
 from openai import OpenAI
@@ -7,7 +9,7 @@ from core.readers.ChunkReaderFactory import ChunkReaderFactory
 from core.readers.BaseChunkReader import BaseChunkReader, TChunkArgs
 from core.types import TRagSearchResult, TContextEntry, TCDBMetaEntry, TConfigOpenAI
 from core.ResourceIndexer import ResourceIndexer
-
+from core.utils.paths import get_resource_type
 
 TEST_RESPONSE = """
 В компании Яндекс используются плагины и утилиты командной строки для работы с ИИ, в частности continue и Open CД. Также есть инструмент развёртывания и настройки кодовых ассистентов, позволяющий по кнопке развернуть текущую конфигурацию с доступом к внутренним моделям. Популярным продуктом является автоматическая ревью кода, интегрированная с GitLab: при создании merge request асинхронно запускается ревью, результаты появляются в комментариях [^yandex_01].
@@ -63,8 +65,9 @@ def context_to_string(context_arr: list[TContextEntry]) -> str:
     """Получить контекст как единую строку для вставки в промпт."""
     context_str = ""
     for ctx in context_arr:
-        context_str += f"Источник: {ctx['filepath']}\n"
-        context_str += ctx["content"] + "\n\n"
+        if "text" == ctx["rtype"]:
+            context_str += f"Источник: {ctx['filepath']}\n"
+            context_str += ctx["content"] + "\n\n"
     return context_str.strip()
 
 
@@ -109,25 +112,57 @@ class RagSearch:
         self,
         query: str,
         n_results: int = 10,
-    ) -> TRagSearchResult:
+    ) -> list[TRagSearchResult]:
         """Выполнить RAG-поиск: найти контекст + сгенерировать ответ LLM."""
 
         if "__TEST_RESPONSE__" == query:
-            return self.parse_result(TEST_RESPONSE)
+            return [
+                {
+                    "content": "",
+                    "refs": [
+                        { "id": "", "note": "", "filepath": os.path.abspath("static/images/6VCR-01.jpg") },
+                        { "id": "", "note": "", "filepath": os.path.abspath("static/images/6VCR-02.jpg") },
+                        { "id": "", "note": "", "filepath": os.path.abspath("static/images/6VCR-03.jpg") },
+                    ],
+                },
+                self.parse_result(TEST_RESPONSE),
+            ]
+
+        results: list[TRagSearchResult] = [
+            { # Файловый поиск
+                "content": "", # всегда пустой
+                "refs": [],    # ссылки на файлы
+            },
+            { # LLM поиск
+                "content": "", # ответ LLM
+                "refs": [],    # ссылки на источники
+            },
+        ]
 
         context_arr = self.fetch_context(query, n_results)
-        context = context_to_string(context_arr).strip()
+        context_str = ""
+
+        for ctx in context_arr:
+            if "text" == ctx["rtype"]:
+                context_str += f"Источник: {ctx['filepath']}\n"
+                context_str += ctx["content"] + "\n\n"
+
+            elif "image" == ctx["rtype"]:
+                results[0]["refs"].append({
+                    "id": "",
+                    "note": "",
+                    "filepath": ctx["filepath"],
+                })
+
+        # Текстового контекста нет => в LLM передавать нечего -- вернуть ответ
+        if not context_str:
+            return results
         
-        if not context:
-            raise Exception("В индексе нет записей")
-        
-        prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context, query=query)
+        prompt = SYSTEM_PROMPT_TEMPLATE.format(context=context_str, query=query)
         
         if "__TEST_RETURN_PROMPT__" == query:
-            return {
-                "content": prompt,
-                "refs": [],
-            }
+            results[1]["content"] = prompt
+            return results
 
         client = OpenAI(
             base_url=self.openai_config["base_url"],
@@ -184,13 +219,42 @@ class RagSearch:
         if self.logger:
             self.logger.info({
                 "event": "rag-search",
-                "context_length": len(context),
+                "context_length": len(context_str),
                 "prompt_length": len(prompt),
                 "content_length": len(content),
                 "datetime": str(datetime.now()),
             })
         
-        return self.parse_result(content)
+        results[1] = self.parse_result(content)
+
+        return results
+    
+
+    def search_meta(
+        self,
+        query: str,
+        n_results: int = 10,
+        rtype: str = "",
+    ) -> list[TCDBMetaEntry]:
+        """Найти релевантные векторы по запросу."""
+
+        outputs: list[float] = self.resource_indexer.pipe(query)[0][0]
+
+        query_args: dict[str, typing.Any] = {
+            "query_embeddings": [outputs],
+            "n_results": n_results,
+        }
+
+        if rtype:
+            query_args["where"] = {
+                "rtype": rtype,
+            }
+
+        results = self.resource_indexer.collection.query(**query_args)
+
+        result: list[TCDBMetaEntry] = results["metadatas"][0] or []
+
+        return result
 
 
     def fetch_context(
@@ -213,13 +277,23 @@ class RagSearch:
 
         for meta in metas:
             filepath = meta.get("filepath", "")
+            rtype = get_resource_type(filepath)
+
             if not filepath:
+                continue
+
+            if "image" == get_resource_type(filepath):
+                context.append({
+                    "filepath": filepath,
+                    "content": "",
+                    "rtype": rtype,
+                })
                 continue
 
             if filepath not in file_metas:
                 file_metas[filepath] = []
 
-            file_metas[filepath].append({
+                file_metas[filepath].append({
                 "from": meta["from"],
                 "to": meta["to"],
             })
@@ -228,6 +302,7 @@ class RagSearch:
 
         for filepath, meta_list in file_metas.items():
             reader = _readers.get(filepath, None)
+            rtype = get_resource_type(filepath)
 
             if not reader:
                 reader = ChunkReaderFactory.get_reader(filepath)
@@ -240,6 +315,7 @@ class RagSearch:
             context.append({
                 "filepath": filepath,
                 "content": content,
+                "rtype": rtype,
             })
 
         context.sort(key=lambda row: row["filepath"])

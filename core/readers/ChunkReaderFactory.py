@@ -7,6 +7,7 @@ from core.readers.PDFChunkReader import PDFChunkReader
 # from core.readers.DOCXChunkReader import DOCXChunkReader
 from core.readers.DOCX2MDChunkReader import DOCX2MDChunkReader
 from core.readers.WebChunkReader import WebChunkReader
+from core.readers.Image2TextReader import Image2TextReader
 
 
 class ChunkReaderFactory:
@@ -33,5 +34,8 @@ class ChunkReaderFactory:
 
         elif lowered.endswith('.pdf'):
             return PDFChunkReader(filepath_or_url)
+        
+        elif lowered.endswith(('.jpg', '.jpeg', '.png')):
+            return Image2TextReader(filepath_or_url)
 
         raise ValueError(f"Unsupported file format: {filepath_or_url}")

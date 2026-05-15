@@ -11,8 +11,9 @@
         <div class="b-header__container">
             <div class="b-header__logo">RAG-ПОИСК</div>
             <nav class="b-nav">
-                <a class="b-nav__link" href="/">Поиск</a>
-                <a class="b-nav__link b-nav__link_active" href="/add">Добавить документ</a>
+                <a class="b-nav__link" href="/">Нейропоиск</a>
+                <a class="b-nav__link" href="/search-files">Поиск файлов</a>
+                <a class="b-nav__link b-nav__link_active" href="/add">Добавить</a>
             </nav>
         </div>
     </header>
@@ -24,7 +25,7 @@
             <div class="b-field">
                 <label class="b-field__label" for="file_path">Путь к файлам</label>
                 <textarea class="b-field__input b-field__input_size_large" id="file_path" placeholder=""></textarea>
-                <div class="b-field__help">Поддерживаемые форматы: .docx, .pdf, .txt, .md, .html и ссылки на веб-страницы</div>
+                <div class="b-field__help">Поддерживаемые форматы: .docx, .pdf, .txt, .md, .html, .jpeg, .jpg, .png и ссылки на веб-страницы</div>
             </div>
             
             <button class="b-btn" id="add-btn">Добавить в индекс</button>
