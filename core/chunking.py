@@ -2,6 +2,7 @@ import typing
 from core.types import TChunk
 
 SEQ_LEN_LIM = 1024
+LARGE_INT = 999_999_999_999
 
 TWordIteratorResult = typing.Iterable[
     tuple[
@@ -148,3 +149,37 @@ def create_chunks_with_coords(
             "from": list(chunk_start),
             "to": list(chunk_end),
         }
+
+
+def expand_1d(
+    from_: list[int],
+    to_: list[int],
+    paddings: int,
+    min_index: int = 0,
+    max_index: int = LARGE_INT,
+) -> tuple[list[int], list[int]]:
+    """Расширить 1D координаты чанка."""
+    from_ = from_.copy()
+    to_ = to_.copy()
+
+    from_[0] = max(min_index, from_[0] - paddings)
+    to_[0] = min(max_index, to_[0] + paddings)
+
+    return from_, to_
+
+
+def expand_2d(
+    from_: list[int],
+    to_: list[int],
+    paddings: int,
+    min_index: int = 0,
+    max_index: int = LARGE_INT,
+) -> tuple[list[int], list[int]]:
+    """Расширить 2D координаты чанка [page/para, char_idx]."""
+    from_ = from_.copy()
+    to_ = to_.copy()
+
+    from_[1] = max(min_index, from_[1] - paddings)
+    to_[1] = min(max_index, to_[1] + paddings)
+
+    return from_, to_

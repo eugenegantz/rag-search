@@ -9,6 +9,7 @@ from core.readers.ChunkReaderFactory import ChunkReaderFactory
 from core.readers.BaseChunkReader import BaseChunkReader, TChunkArgs
 from core.types import TRagSearchResult, TContextEntry, TCDBMetaEntry, TConfigOpenAI
 from core.ResourceIndexer import ResourceIndexer
+from core.chunking import SEQ_LEN_LIM
 from core.utils.paths import get_resource_type
 
 TEST_RESPONSE = """
@@ -293,7 +294,7 @@ class RagSearch:
             if filepath not in file_metas:
                 file_metas[filepath] = []
 
-                file_metas[filepath].append({
+            file_metas[filepath].append({
                 "from": meta["from"],
                 "to": meta["to"],
             })
@@ -308,7 +309,7 @@ class RagSearch:
                 reader = ChunkReaderFactory.get_reader(filepath)
                 _readers[filepath] = reader
 
-            chunks = reader.getChunks(meta_list)
+            chunks = reader.getChunks(meta_list, paddings=SEQ_LEN_LIM)
 
             content = "\n\n".join(chunk["text"] for chunk in chunks)
 

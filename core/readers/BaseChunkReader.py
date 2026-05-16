@@ -1,6 +1,7 @@
 import typing
 from abc import ABC, abstractmethod
 from core.types import TChunk, TChunkArgs
+from core.chunking import expand_1d
 
 
 
@@ -37,13 +38,26 @@ class BaseChunkReader(ABC):
         pass
 
 
-    def getChunks(self, chunks_meta: list[TChunkArgs]) -> list[TChunk]:
+    def _expand_coords(
+        self,
+        from_: list[int],
+        to_: list[int],
+        paddings: int,
+    ) -> tuple[list[int], list[int]]:
+        """Расширить координаты чанка. Переопределяется в reader'ах с многомерными координатами."""
+        return expand_1d(from_, to_, paddings)
+
+
+    def getChunks(self, chunks_meta: list[TChunkArgs], paddings: int = 0) -> list[TChunk]:
         """
         Принять список чанков с координатами from/to,
         объединить перекрывающиеся диапазоны и вернуть чанки без дублей.
         """
         if not chunks_meta:
             return []
+
+        if paddings < 0:
+            raise ValueError("padding < 0")
 
         # Сортировать по координатам from (лексикографическая)
         sorted_meta = sorted(chunks_meta, key=lambda x: x["from"])
@@ -52,9 +66,13 @@ class BaseChunkReader(ABC):
         current_from                = sorted_meta[0]["from"]
         current_to                  = sorted_meta[0]["to"]
 
+        current_from, current_to = self._expand_coords(current_from, current_to, paddings)
+
         for meta in sorted_meta[1:]:
-            next_from   = meta["from"]
-            next_to     = meta["to"]
+            next_from = meta["from"]
+            next_to = meta["to"]
+
+            next_from, next_to = self._expand_coords(next_from, next_to, paddings)
 
             # Перекрытие: next_from <= current_to (лексикографическое сравнение)
             if next_from <= current_to:

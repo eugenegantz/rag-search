@@ -2,8 +2,9 @@ import typing
 from pypdf import PdfReader
 from core.chunking import create_chunks_with_coords
 from core.readers.BaseChunkReader import BaseChunkReader
+from core.chunking import expand_2d
 from core.types import TChunk
-
+from core.utils.math import clamp
 
 class PDFChunkReader(BaseChunkReader):
     """Ридер для PDF-файлов. Координаты чанка: [page, char_idx]."""
@@ -35,6 +36,10 @@ class PDFChunkReader(BaseChunkReader):
                 yield char, (page_idx, char_idx)
 
 
+    def _expand_coords(self, from_: list[int], to_: list[int], paddings: int) -> tuple[list[int], list[int]]:
+        return expand_2d(from_, to_, paddings)
+
+
     def getChunk(self, from_: list[int], to: list[int]) -> TChunk:
         self.load()
 
@@ -44,6 +49,16 @@ class PDFChunkReader(BaseChunkReader):
         start_page, start_char  = from_
         end_page, end_char      = to
         texts: list[str]        = []
+
+        if len(self._reader.pages) < 1:
+            return {
+                "text": "",
+                "from": [0, 0],
+                "to": [0, 0],
+            }
+
+        start_page = clamp(start_page, 0, len(self._reader.pages) - 1)
+        end_page = clamp(end_page, 0, len(self._reader.pages) - 1)
 
         for page_idx in range(start_page, end_page + 1):
             page = self._reader.pages[page_idx]

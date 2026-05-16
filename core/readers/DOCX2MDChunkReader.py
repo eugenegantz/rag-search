@@ -7,7 +7,7 @@ from core.types import TChunk
 
 
 class DOCX2MDChunkReader(BaseChunkReader):
-    """Ридер для DOCX-файлов. Координаты чанка: [paragraph, char_idx]."""
+    """Ридер для DOCX-файлов. Координаты чанка: [char_idx]."""
 
     def __init__(self, filepath: str):
         self.filepath = filepath

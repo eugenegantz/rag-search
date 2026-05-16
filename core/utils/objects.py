@@ -1,10 +1,12 @@
-# аналог lodash.get
-# Вернуть значение сложного объекта по указанному пути
 def get(
     obj: dict[str, object] | list[object] | None,
     path: list[str | int],
     defval: object = None
 ) -> object:
+    """
+    Аналог lodash.get.
+    Вернуть значение сложного объекта по указанному пути.
+    """
     for k in path:
         if obj is None:
             return defval

@@ -4,7 +4,6 @@ from core.readers.TXTChunkReader import TXTChunkReader
 from core.readers.MDChunkReader import MDChunkReader
 from core.readers.HTMLChunkReader import HTMLChunkReader
 from core.readers.PDFChunkReader import PDFChunkReader
-# from core.readers.DOCXChunkReader import DOCXChunkReader
 from core.readers.DOCX2MDChunkReader import DOCX2MDChunkReader
 from core.readers.WebChunkReader import WebChunkReader
 from core.readers.Image2TextReader import Image2TextReader

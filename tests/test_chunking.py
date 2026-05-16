@@ -3,6 +3,8 @@ from core.chunking import (
     create_words_with_coords,
     create_sentences_with_coords,
     create_chunks_with_coords,
+    expand_1d,
+    expand_2d,
     SEQ_LEN_LIM,
 )
 
@@ -172,6 +174,94 @@ class TestCreateChunksWithCoords(unittest.TestCase):
             end = chunk["to"][0]
             self.assertGreater(start, prev_end)
             prev_end = end
+
+
+class TestExpand1D(unittest.TestCase):
+    def test_basic_expansion(self):
+        from_ = [10]
+        to_ = [20]
+        result_from, result_to = expand_1d(from_, to_, paddings=5)
+        self.assertEqual(result_from, [5])
+        self.assertEqual(result_to, [25])
+
+    def test_from_clamped_to_zero(self):
+        from_ = [3]
+        to_ = [10]
+        result_from, result_to = expand_1d(from_, to_, paddings=5)
+        self.assertEqual(result_from, [0])
+        self.assertEqual(result_to, [15])
+
+    def test_to_clamped_to_max(self):
+        from_ = [10]
+        to_ = [20]
+        result_from, result_to = expand_1d(from_, to_, paddings=5, max_index=22)
+        self.assertEqual(result_from, [5])
+        self.assertEqual(result_to, [22])
+
+    def test_zero_padding(self):
+        from_ = [10]
+        to_ = [20]
+        result_from, result_to = expand_1d(from_, to_, paddings=0)
+        self.assertEqual(result_from, [10])
+        self.assertEqual(result_to, [20])
+
+    def test_from_already_zero(self):
+        from_ = [0]
+        to_ = [10]
+        result_from, result_to = expand_1d(from_, to_, paddings=5)
+        self.assertEqual(result_from, [0])
+        self.assertEqual(result_to, [15])
+
+    def test_does_not_mutate_input(self):
+        from_ = [10]
+        to_ = [20]
+        expand_1d(from_, to_, paddings=5)
+        self.assertEqual(from_, [10])
+        self.assertEqual(to_, [20])
+
+
+class TestExpand2D(unittest.TestCase):
+    def test_basic_expansion(self):
+        from_ = [2, 10]
+        to_ = [2, 20]
+        result_from, result_to = expand_2d(from_, to_, paddings=5)
+        self.assertEqual(result_from, [2, 5])
+        self.assertEqual(result_to, [2, 25])
+
+    def test_char_idx_clamped_to_zero(self):
+        from_ = [2, 3]
+        to_ = [2, 10]
+        result_from, result_to = expand_2d(from_, to_, paddings=5)
+        self.assertEqual(result_from, [2, 0])
+        self.assertEqual(result_to, [2, 15])
+
+    def test_char_idx_clamped_to_max(self):
+        from_ = [2, 10]
+        to_ = [2, 20]
+        result_from, result_to = expand_2d(from_, to_, paddings=5, max_index=22)
+        self.assertEqual(result_from, [2, 5])
+        self.assertEqual(result_to, [2, 22])
+
+    def test_zero_padding(self):
+        from_ = [2, 10]
+        to_ = [2, 20]
+        result_from, result_to = expand_2d(from_, to_, paddings=0)
+        self.assertEqual(result_from, [2, 10])
+        self.assertEqual(result_to, [2, 20])
+
+    def test_page_coord_unchanged(self):
+        from_ = [5, 10]
+        to_ = [7, 20]
+        result_from, result_to = expand_2d(from_, to_, paddings=5)
+        self.assertEqual(result_from[0], 5)
+        self.assertEqual(result_to[0], 7)
+
+    def test_does_not_mutate_input(self):
+        from_ = [2, 10]
+        to_ = [2, 20]
+        expand_2d(from_, to_, paddings=5)
+        self.assertEqual(from_, [2, 10])
+        self.assertEqual(to_, [2, 20])
 
 
 if __name__ == "__main__":
