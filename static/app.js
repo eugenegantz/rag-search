@@ -71,7 +71,8 @@ async function searchDocuments() {
             showStatus('search-status', data.error, 'error');
             resultsDiv.innerHTML = '';
         } else {
-            showStatus('search-status', `Найдено результатов: ${data.results?.length || 0}`, 'success');
+            let refsAmount = (data.results || []).reduce((sum, res) => sum + res.refs.length, 0);
+            showStatus('search-status', `Найдено ссылок: ${refsAmount}`, 'success');
             renderResults(data.results || []);
         }
     } catch (err) {
