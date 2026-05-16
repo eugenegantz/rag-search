@@ -7,17 +7,8 @@ from transformers import AutoProcessor, AutoModelForImageTextToText
 from core.deps.default_logger import default_logger
 
 if typing.TYPE_CHECKING:
-    # from transformers.generation.utils import GenerationMixin
     from transformers import Qwen3VLProcessor
-    from torch import Tensor
-    
-    # 1. Define a singular interface handling both generation and attributes
-    class GeneratableModel(typing.Protocol):
-        def generate(self, **kwargs: typing.Any) -> Tensor: ...
-        
-        # This mirrors all standard properties from the true model class
-        def __getattr__(self, name: str) -> typing.Any: ...
-
+    from core.types import GeneratableModel
 
 torch.set_num_threads(4)
 

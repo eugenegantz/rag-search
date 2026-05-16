@@ -6,17 +6,27 @@ from core.readers.BaseChunkReader import BaseChunkReader
 from core.types import TChunk
 from PIL import Image
 from transformers import BatchFeature
-from core.deps.image_recognition import processor, model
+
+if typing.TYPE_CHECKING:
+    from transformers import Qwen3VLProcessor
+    from core.types import GeneratableModel
 
 TMessagesObject = list[dict[str, typing.Any]]
 
 class Image2TextReader(BaseChunkReader):
     """Ридер для чтения сюжетов в изображениях."""
 
-    def __init__(self, filepath: str):
+    def __init__(
+        self,
+        filepath: str,
+        model: "GeneratableModel",
+        processor: "Qwen3VLProcessor",
+    ):
         self.filepath = filepath
         self._text: str = ""
         self._loaded = False
+        self.processor = processor
+        self.model = model
 
 
     def load(self) -> None:
@@ -48,7 +58,7 @@ class Image2TextReader(BaseChunkReader):
             ]
         }]
 
-        prompt: str = processor.apply_chat_template( # type: ignore
+        prompt: str = self.processor.apply_chat_template( # type: ignore
             messages_object,
             tokenize=False,
             add_generation_prompt=True,
@@ -56,17 +66,17 @@ class Image2TextReader(BaseChunkReader):
         )
 
         # 5. Preprocess inputs
-        inputs: BatchFeature = processor(text=[prompt], images=[image], return_tensors="pt") # type: ignore
+        inputs: BatchFeature = self.processor(text=[prompt], images=[image], return_tensors="pt") # type: ignore
 
         # The framework shifts individual layers to the GPU; map the inputs accordingly
-        inputs: BatchFeature = typing.cast(BatchFeature, inputs.to(model.device)) # type: ignore
+        inputs: BatchFeature = typing.cast(BatchFeature, inputs.to(self.model.device)) # type: ignore
 
         with torch.no_grad():
-            generated_ids = model.generate(
+            generated_ids = self.model.generate(
                 **inputs,
                 max_new_tokens=200,
 
-                # pad_token_id=processor.tokenizer.eos_token_id,  # Add this line
+                # pad_token_id=self.processor.tokenizer.eos_token_id,  # Add this line
 
                 # max_new_tokens=150,
                 # max_new_tokens=40,
@@ -83,7 +93,7 @@ class Image2TextReader(BaseChunkReader):
             out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs["input_ids"], generated_ids)
         ]
 
-        output_text: list[str] = processor.batch_decode( # type: ignore
+        output_text: list[str] = self.processor.batch_decode( # type: ignore
             generated_ids_trimmed,
             skip_special_tokens=True,
             clean_up_tokenization_spaces=False,

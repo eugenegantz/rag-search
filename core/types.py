@@ -47,3 +47,15 @@ class TRagSearchResult(typing.TypedDict):
     # error: str
     content: str
     refs: list[dict[str, typing.Any]]
+
+
+if typing.TYPE_CHECKING:
+    # from transformers.generation.utils import GenerationMixin
+    from torch import Tensor
+
+    # 1. Define a singular interface handling both generation and attributes
+    class GeneratableModel(typing.Protocol):
+        def generate(self, **kwargs: typing.Any) -> Tensor: ...
+
+        # This mirrors all standard properties from the true model class
+        def __getattr__(self, name: str) -> typing.Any: ...
