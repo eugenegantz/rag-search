@@ -33,7 +33,12 @@ class RAGClient:
             raise ConnectionError(
                 "Демон не запущен. Запустите: python cli.py daemon start"
             )
-        self.client = httpx.Client(base_url=self.base_url, timeout=120.0)
+        self.client = httpx.Client(
+            base_url=self.base_url,
+            timeout=120.0,
+            trust_env=False, # игнорировать переменные: https_proxy, http_proxy, all_proxy
+            proxy=None,      # пустой список прокси -- отключить
+        )
 
     def _post(self, path: str, json_data: dict[str, object]) -> dict[str, Any]:
         r = self.client.post(path, json=json_data)
@@ -73,10 +78,19 @@ class RAGClient:
 def is_daemon_alive() -> bool:
     """Быстрая проверка, отвечает ли демон."""
     url = get_daemon_url()
+
     if not url:
         return False
+
     try:
-        httpx.get(f"{url}/api/health", timeout=2.0).raise_for_status()
+        httpx.get(
+            f"{url}/api/health",
+            timeout=2.0,
+            trust_env=False, # игнорировать переменные: https_proxy, http_proxy, all_proxy
+            proxy=None,      # пустой список прокси -- отключить
+        ).raise_for_status()
+
         return True
-    except Exception:
+
+    except Exception as err:
         return False
