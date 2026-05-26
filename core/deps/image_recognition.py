@@ -5,6 +5,7 @@ import typing
 from pathlib import Path
 from transformers import AutoProcessor, AutoModelForImageTextToText
 from core.deps.default_logger import default_logger
+from app_config.config import config
 
 if typing.TYPE_CHECKING:
     from transformers import Qwen3VLProcessor
@@ -18,7 +19,7 @@ DEFAULT_MODEL_NAME = "huihui-ai/Huihui-Qwen3.5-0.8B-abliterated"
 # Если локальная модель не найдена -- скачать из репозитория
 MODEL_LOCAL_PATH = Path("./models") / DEFAULT_MODEL_NAME
 
-_device_map = "auto"
+_device_map = config["torchvision"]["device_map"]
 _dtype = torch.float32
 
 if MODEL_LOCAL_PATH.exists() and any(MODEL_LOCAL_PATH.iterdir()):

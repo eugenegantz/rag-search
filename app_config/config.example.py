@@ -20,5 +20,15 @@ config: core.types.TConfig = {
     "daemon": {
         "host": "127.0.0.1",
         "port": 8367,
-    }
+    },
+
+    # Настройки torchvision
+    "torchvision": {
+        "device_map": "auto",
+    },
+
+    # Настройки transformer
+    "embeddings": {
+        "device_map": "auto",
+    },
 }
