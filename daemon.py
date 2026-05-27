@@ -46,7 +46,7 @@ TASK_REGISTRY: dict[str, typing.Callable[..., typing.Any]] = {
 background_queue = SQLiteQueue(DB_FILE, TASK_REGISTRY)
 
 queue_running = threading.Event()
-queue_running.clear()
+queue_running.set()
 
 def background_worker():
     while True:
