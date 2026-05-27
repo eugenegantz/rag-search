@@ -1,3 +1,4 @@
+import re
 import typing
 import torch
 
@@ -101,6 +102,13 @@ class Image2TextReader(BaseChunkReader):
         )
 
         self._text = output_text[0]
+
+        _filepath = self.filepath.replace("\\", "/")
+        filename = _filepath.split("/")[-1].split(".")[0]
+        filename = re.sub(r"[^\d\w\s\-\_\:]+", "", filename)
+        filename_words = re.split(r"[\s_\-\:]+", filename)
+
+        self._text = self._text.strip() + " " + (" ".join(filename_words))
 
         self._loaded = True
 

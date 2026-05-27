@@ -80,8 +80,11 @@ class ResourceIndexer:
         reader = ChunkReaderFactory.get_reader(filepath)
         chunks = reader.createChunksIterator()
         chunks_length = 0
+        chunk0 = None
 
         for chunk in chunks:
+            if 0 == chunks_length:
+                chunk0 = chunk
             chunks_length += 1
             emb = self.pipe(chunk["text"])[0][0]
             _id = str(uuid.uuid4())
@@ -104,6 +107,7 @@ class ResourceIndexer:
                 "target": "ResourceIndexer",
                 "filepath": filepath,
                 "chunks.length": chunks_length,
+                "chunks": [chunk0] if "image" == rtype else None,
                 "datetime": str(datetime.now()),
             })
 
