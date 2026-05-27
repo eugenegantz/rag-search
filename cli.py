@@ -356,6 +356,105 @@ def index_remove(
     console.print(f"[green]✓ Удалено[/green]")
 
 
+# ═══════════════════════════════════════════════
+# Подкоманда: index queue
+# ═══════════════════════════════════════════════
+
+queue_app = typer.Typer(
+    help="Управление очередью индексации",
+    no_args_is_help=True,
+)
+index_app.add_typer(queue_app, name="queue")
+
+
+@queue_app.command("get")
+def queue_get():
+    """
+    Показать содержимое очереди и статус.
+    """
+    if not is_daemon_alive():
+        console.print(
+            "[bold red]Демон не запущен.[/bold red] "
+            "Запустите: [bold]python cli.py daemon start[/bold]"
+        )
+        raise typer.Exit(1)
+
+    client = RAGClient()
+    status = client.index_queue_status()
+    res = client.index_queue_get()
+
+    if status.get("error"):
+        console.print(f"[red]{status['error']}[/red]")
+        raise typer.Exit(1)
+
+    if res.get("error"):
+        console.print(f"[red]{res['error']}[/red]")
+        raise typer.Exit(1)
+
+    paused = status.get("paused", False)
+    queue_list: list[str] = res.get("queue", [])
+
+    state_text = "[bold yellow]⏸ PAUSED[/bold yellow]" if paused else "[bold green]▶ ACTIVE[/bold green]"
+    console.print(f"Статус очереди: {state_text}")
+
+    if not queue_list:
+        console.print("[dim]Очередь пуста.[/dim]")
+        return
+
+    table = Table(title="Очередь индексации")
+    table.add_column("#", style="dim", justify="right")
+    table.add_column("Путь к файлу", style="green")
+
+    for i, filepath in enumerate(queue_list, 1):
+        table.add_row(str(i), filepath)
+
+    console.print(table)
+    console.print(f"\nВсего в очереди: [bold]{len(queue_list)}[/bold]")
+
+
+@queue_app.command("pause")
+def queue_pause():
+    """
+    Приостановить обработку очереди.
+    """
+    if not is_daemon_alive():
+        console.print(
+            "[bold red]Демон не запущен.[/bold red] "
+            "Запустите: [bold]python cli.py daemon start[/bold]"
+        )
+        raise typer.Exit(1)
+
+    client = RAGClient()
+    res = client.index_queue_pause()
+
+    if res.get("error"):
+        console.print(f"[red]{res['error']}[/red]")
+        raise typer.Exit(1)
+
+    console.print("[bold yellow]⏸ Очередь приостановлена[/bold yellow]")
+
+
+@queue_app.command("unpause")
+def queue_unpause():
+    """
+    Возобновить обработку очереди.
+    """
+    if not is_daemon_alive():
+        console.print(
+            "[bold red]Демон не запущен.[/bold red] "
+            "Запустите: [bold]python cli.py daemon start[/bold]"
+        )
+        raise typer.Exit(1)
+
+    client = RAGClient()
+    res = client.index_queue_unpause()
+
+    if res.get("error"):
+        console.print(f"[red]{res['error']}[/red]")
+        raise typer.Exit(1)
+
+    console.print("[bold green]▶ Очередь возобновлена[/bold green]")
+
 
 if __name__ == "__main__":
     app()

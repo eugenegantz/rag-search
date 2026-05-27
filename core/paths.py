@@ -7,3 +7,5 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATE_DIR = PROJECT_ROOT / ".rag"
 PORT_FILE = STATE_DIR / "daemon.port"
 PID_FILE = STATE_DIR / "daemon.pid"
+
+DB_FILE = PROJECT_ROOT / "db" / "rag.sqlite3"

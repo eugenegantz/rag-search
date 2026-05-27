@@ -64,6 +64,18 @@ class RAGClient:
     
     def index_query(self, query: str, top_k: int = 10, rtype: str = "") -> dict[str, Any]:
         return self._post("/api/index/query", { "query": query, "top_k": top_k, "rtype": rtype })
+    
+    def index_queue_get(self) -> dict[str, Any]:
+        return self._post("/api/index/queue/get", {})
+
+    def index_queue_pause(self) -> dict[str, Any]:
+        return self._post("/api/index/queue/pause", {})
+
+    def index_queue_unpause(self) -> dict[str, Any]:
+        return self._post("/api/index/queue/unpause", {})
+
+    def index_queue_status(self) -> dict[str, Any]:
+        return self._get("/api/index/queue/status")
 
     def files(self) -> dict[str, Any]:
         return self._get("/api/index/get")

@@ -6,9 +6,10 @@ RAG Daemon -- единый backend.
 """
 
 import os
-import queue
+import json
 import typing
 import uvicorn
+import sqlite3
 
 import threading
 
@@ -21,7 +22,8 @@ from pydantic import BaseModel
 from pathlib import Path as _Path
 
 from app_config.config import config
-from core.paths import PORT_FILE, PID_FILE
+from core.paths import PORT_FILE, PID_FILE, DB_FILE
+from core.SQLiteQueue import SQLiteQueue
 
 # import core.deps as deps
 from core.deps.default_logger import default_logger as logger
@@ -34,28 +36,39 @@ DAEMON_PORT = config["daemon"]["port"]
 
 _uvicorn_server: uvicorn.Server | None = None
 
+# --- Очередь ---
+
+TASK_REGISTRY: dict[str, typing.Callable[..., typing.Any]] = {
+    "upsert_file_to_index": _indexer.upsert_file_to_index,
+}
+
 # Фоновая очередь индексации
-background_queue: queue.Queue[
-    tuple[
-        typing.Callable[..., typing.Any],
-        list[typing.Any]
-    ]
-] = queue.Queue()
+background_queue = SQLiteQueue(DB_FILE, TASK_REGISTRY)
+
+queue_running = threading.Event()
+queue_running.clear()
 
 def background_worker():
     while True:
+        # Если флаг сброшен, поток заблокируется здесь и будет ждать .set()
+        queue_running.wait()
+
         func, args = background_queue.get()
         logger.info({ "event": "background-worker-task", "args": args, "datetime": str(datetime.now()) })
+
         try:
             func(*args)
         except Exception as e:
             logger.error({ "event": "background-worker-error", "error": e, "datetime": str(datetime.now()) })
-        finally:
-            background_queue.task_done()
+
+# Как управлять:
+# queue_running.clear()  -- Поставить на паузу (текущая задача доделается, новые не возьмутся)
+# queue_running.set()    -- Снять с паузы
 
 worker_thread = threading.Thread(target=background_worker, daemon=True)
 worker_thread.start()
 
+# ------------------
 
 # @asynccontextmanager
 # async def lifespan(app: FastAPI):
@@ -204,10 +217,7 @@ async def api_index_add(request: TAPIIndexAddReq):
     # Фоновая индексация
     for filepath in request.filepath:
         logger.info({ "event": "background-queue-put", "args": [filepath], "datetime": str(datetime.now()) })
-        background_queue.put((
-            _indexer.upsert_file_to_index,
-            [filepath]
-        ))
+        background_queue.put("upsert_file_to_index", [filepath])
 
     return {
         "error": "",
@@ -222,6 +232,51 @@ def api_index_get():
     assert _indexer is not None
     return {
         "filepaths": _indexer.list_indexed_files(),
+    }
+
+
+@handleErrorDecorator
+@app.post("/api/index/queue/pause")
+def api_index_queue_pause():
+    """Приостановить обработку очереди"""
+    try:
+        queue_running.clear()
+        return { "error": "" }
+
+    except Exception as err:
+        return { "error": str(err) }
+
+
+@handleErrorDecorator
+@app.post("/api/index/queue/unpause")
+def api_index_queue_unpause():
+    """Возобновить обработку очереди"""
+    try:
+        queue_running.set()
+        return { "error": "" }
+
+    except Exception as err:
+        return { "error": str(err) }
+
+
+@handleErrorDecorator
+@app.post("/api/index/queue/get")
+def api_index_queue_get():
+    """Получить содержимое очереди без изменения"""
+    items = background_queue.peek_all()
+    queue_list = [str(item["args"][0]) for item in items]
+
+    return {
+        "queue": queue_list
+    }
+
+
+@handleErrorDecorator
+@app.get("/api/index/queue/status")
+def api_index_queue_status():
+    """Получить статус очереди (paused/active)"""
+    return {
+        "paused": not queue_running.is_set(),
     }
 
 
