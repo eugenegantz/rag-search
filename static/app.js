@@ -1,6 +1,7 @@
 const API_BASE = '';
 
 const ALLOWED_EXTENSIONS = ['.docx', '.pdf', '.txt', '.md', '.html', '.jpeg', '.jpg', '.png'];
+const QUERY_LENGTH_LIMIT = 1024;
 
 function validateFilePath(path) {
     if (/^http(s?):\/\//ig.test(path)) {
@@ -356,5 +357,15 @@ document.addEventListener('DOMContentLoaded', () => {
             + "\nZ:/abc/Фото.jpg"
             + "\nZ:/abc/Скриншот.png"
             + "\nhttps://website.com/page"
+    }
+
+    const elemQuery = document.querySelector('#query');
+
+    if (elemQuery) {
+        elemQuery.addEventListener('change', function() {
+            if (this.value.length > QUERY_LENGTH_LIMIT) {
+                this.value = this.value.slice(0, QUERY_LENGTH_LIMIT);
+            }
+        }, false)
     }
 });
