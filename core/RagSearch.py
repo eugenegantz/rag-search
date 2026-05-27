@@ -3,7 +3,7 @@ import json
 import typing
 import logging
 from datetime import datetime
-from openai import OpenAI
+from openai import OpenAI, DefaultHttpxClient
 
 from core.readers.ChunkReaderFactory import ChunkReaderFactory
 from core.readers.BaseChunkReader import BaseChunkReader, TChunkArgs
@@ -82,6 +82,10 @@ class RagSearch:
         self.resource_indexer = resource_indexer
         self.logger = logger
         self.openai_config = openai_config
+        self.http_client = DefaultHttpxClient(
+            trust_env=False, # игнорировать переменные: https_proxy, http_proxy, all_proxy
+            proxy=None,      # пустой список прокси -- отключить
+        )
 
 
     def parse_result(self, result: str) -> TRagSearchResult:
@@ -169,6 +173,7 @@ class RagSearch:
             base_url=self.openai_config["base_url"],
             api_key=self.openai_config["api_key"],
             default_headers=self.openai_config.get("default_headers"),
+            http_client=self.http_client,
         )
         
         res = client.chat.completions.create(
