@@ -2,6 +2,7 @@ const API_BASE = '';
 
 const ALLOWED_EXTENSIONS = ['.docx', '.pdf', '.txt', '.md', '.html', '.jpeg', '.jpg', '.png'];
 const QUERY_LENGTH_LIMIT = 1024;
+const DEFAULT_TOP_K = 10;
 
 function validateFilePath(path) {
     if (/^http(s?):\/\//ig.test(path)) {
@@ -42,11 +43,11 @@ function setLoading(buttonId, isLoading) {
 
 async function searchDocuments() {
     const queryInput = document.getElementById('query');
-    // const topKInput = document.getElementById('top_k');
+    const topkInput = document.getElementById('topk');
     const resultsDiv = document.getElementById('results');
 
     const query = queryInput.value.trim();
-    // const topK = parseInt(topKInput.value) || 5;
+    const topk = parseInt(topkInput.value) || DEFAULT_TOP_K;
 
     if (!query) {
         showStatus('search-status', 'Введите поисковый запрос', 'error');
@@ -62,8 +63,8 @@ async function searchDocuments() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 query,
-                // top_k: topK
-            })
+                top_k: topk,
+            }),
         });
 
         const data = await response.json();
@@ -182,11 +183,13 @@ function renderResults(results) {
 
 async function searchFiles() {
     const queryInput = document.getElementById('query');
+    const topkInput = document.getElementById('topk')
     const resultsDiv = document.getElementById('search-files-results');
 
     if (!resultsDiv) return;
 
     const query = queryInput.value.trim();
+    const topk = parseInt(topkInput.value) || DEFAULT_TOP_K;
 
     if (!query) {
         showStatus('search-files-status', 'Введите поисковый запрос', 'error');
@@ -200,7 +203,10 @@ async function searchFiles() {
         const response = await fetch(`${API_BASE}/api/index/query`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
+            body: JSON.stringify({
+                query,
+                top_k: topk,
+            }),
         });
 
         const data = await response.json();
