@@ -244,7 +244,7 @@ class RagSearch:
     ) -> list[TCDBMetaEntry]:
         """Найти релевантные векторы по запросу."""
 
-        outputs: list[float] = self.resource_indexer.pipe(query)[0][0]
+        outputs: list[float] = self.resource_indexer.pipe(query, "query")[0][0]
 
         query_args: dict[str, typing.Any] = {
             "query_embeddings": [outputs],
@@ -270,7 +270,7 @@ class RagSearch:
     ) -> list[TContextEntry]:
         """Найти релевантные контексты по запросу."""
 
-        outputs = self.resource_indexer.pipe(query)[0][0]
+        outputs = self.resource_indexer.pipe(query, "query")[0][0]
 
         results = self.resource_indexer.collection.query(
             query_embeddings=[outputs],

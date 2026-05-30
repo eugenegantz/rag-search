@@ -13,6 +13,8 @@ class TConfigOpenAI(typing.TypedDict):
 class TConfig(typing.TypedDict):
     openai: TConfigOpenAI
     daemon: TConfigDaemon
+    torchvision: dict[str, str]
+    embeddings: dict[str, str]
 
 TChunk = typing.TypedDict("TChunk", {
     "text": str,

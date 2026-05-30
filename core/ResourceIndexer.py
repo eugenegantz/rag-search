@@ -31,7 +31,10 @@ class ResourceIndexer:
         self.pipe = pipe
         self.logger = logger
         self.name = name
-        self.collection = db.get_or_create_collection(name=name)
+        self.collection = db.get_or_create_collection(
+            name=name,
+            metadata={"hnsw:space": "cosine"} # Options: "l2", "ip", or "cosine"
+        )
 
 
     def unify_path(self, path: str) -> str:
@@ -86,7 +89,7 @@ class ResourceIndexer:
             if 0 == chunks_length:
                 chunk0 = chunk
             chunks_length += 1
-            emb = self.pipe(chunk["text"])[0][0]
+            emb = self.pipe(chunk["text"], "passage")[0][0]
             _id = str(uuid.uuid4())
 
             self.collection.add(

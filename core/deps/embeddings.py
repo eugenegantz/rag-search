@@ -1,8 +1,11 @@
 import os
-from pathlib import Path
-
+import torch.nn.functional as F
 import chromadb
-from transformers import pipeline, AutoModel, AutoTokenizer
+import typing
+
+from torch import Tensor
+from pathlib import Path
+from transformers import AutoModel, AutoTokenizer
 
 from app_config.config import config
 from core.deps.default_logger import default_logger
@@ -53,10 +56,36 @@ else:
 
 print("[DEBUG] model.device =", model.device)
 
-pipe = pipeline(
-    "feature-extraction",
-    model=model,
-    tokenizer=tokenizer,
-    device=model.device,
-)  # type: ignore
+
+def average_pool(
+    last_hidden_states: Tensor,
+    attention_mask: Tensor
+) -> Tensor:
+    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+
+def pipe(
+    input_texts: str,
+    prefix: typing.Literal["query", "passage"],
+):
+    input_texts = prefix + ": " + input_texts
+
+    batch_dict = tokenizer(
+        input_texts,
+        max_length=512,
+        padding=True,
+        truncation=True,
+        return_tensors="pt"
+    )
+
+    outputs = model(**batch_dict)
+
+    embeddings = average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+
+    # L2 нормализация (p=2)
+    embeddings = F.normalize(embeddings, p=2, dim=1)
+
+    return [embeddings.tolist()]
+
+
 db = chromadb.PersistentClient(path=DEFAULT_DB_PATH)
